@@ -1,0 +1,52 @@
+import streamlit as st
+import pandas as pd
+import joblib
+from sklearn.feature_extraction.text import TfidfVectorizer
+
+# Load model and vectorizer
+model = joblib.load("exporter_classifier_model.pkl")
+vectorizer = joblib.load("tfidf_vectorizer.pkl")
+
+st.set_page_config(page_title="Exporter Classifier", layout="centered")
+
+st.title("🌍 Exporter Category Classifier")
+st.write("Upload an Excel file with exporter information to predict categories.")
+
+uploaded_file = st.file_uploader("Choose an Excel file", type=["xlsx"])
+
+if uploaded_file is not None:
+    try:
+        df = pd.read_excel(uploaded_file)
+
+        # Check which columns are available
+        possible_cols = ['exporter_name', 'exporter_add', 'exporter_city']
+        available_cols = [col for col in possible_cols if col in df.columns]
+
+        if not available_cols:
+            st.error("No valid columns found! Please include at least 'exporter_name'.")
+        else:
+            # Combine available columns into one string for prediction
+            df['combined_text'] = df[available_cols].astype(str).apply(lambda row: ' '.join(row), axis=1)
+
+            # Transform using the loaded TF-IDF vectorizer
+            X = vectorizer.transform(df['combined_text'])
+
+            # Make predictions
+            predictions = model.predict(X)
+            df['predicted_category'] = predictions
+
+            st.success("Prediction complete! Here are the first few results:")
+            st.dataframe(df[['predicted_category'] + available_cols].head())
+
+            # Download link
+            output_filename = "classified_exporters.xlsx"
+            df.to_excel(output_filename, index=False)
+            with open(output_filename, "rb") as f:
+                st.download_button(
+                    label="📥 Download Results as Excel",
+                    data=f,
+                    file_name=output_filename,
+                    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+                )
+    except Exception as e:
+        st.error(f"Something went wrong: {e}")
