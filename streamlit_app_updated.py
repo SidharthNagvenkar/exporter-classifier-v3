@@ -1,57 +1,45 @@
 import streamlit as st
 import pandas as pd
 import joblib
-import os
 
-# Load model and vectorizer
-model = joblib.load("exporter_classifier_model.pkl")
-vectorizer = joblib.load("tfidf_vectorizer.pkl")
+# ✅ Check if secrets are loading
+st.title("Exporter Classifier App - OAuth Check")
 
-st.set_page_config(page_title="Exporter Classifier", layout="centered")
+st.subheader("🔐 OAuth Client Info (for test only - remove later)")
+st.write("Client ID:", st.secrets["google_oauth"]["client_id"])
+st.write("Client Secret:", st.secrets["google_oauth"]["client_secret"])
 
-st.title("🌍 Exporter Category Classifier")
-st.write("Upload an Excel file with exporter information to predict categories.")
+# ⬇️ --- Existing app functionality starts here --- ⬇️
 
-uploaded_file = st.file_uploader("Choose an Excel file", type=["xlsx"])
+st.header("Upload Exporter List")
 
-if uploaded_file is not None:
-    try:
-        df = pd.read_excel(uploaded_file)
+uploaded_file = st.file_uploader("Upload Excel file", type=["xlsx"])
 
-        # Check for required columns
-        possible_cols = ['exporter_name', 'exporter_add', 'exporter_city']
-        available_cols = [col for col in possible_cols if col in df.columns]
+if uploaded_file:
+    df = pd.read_excel(uploaded_file)
 
-        if not available_cols:
-            st.error("❌ The file must contain at least the column 'exporter_name'.")
-        else:
-            # Combine the available text columns
-            df['combined_text'] = df[available_cols].fillna('').astype(str).agg(' '.join, axis=1)
+    if "exporter_name" not in df.columns:
+        st.error("❌ Please include a column named 'exporter_name' in your file.")
+    else:
+        # Load ML model and vectorizer
+        model = joblib.load("exporter_classifier_model.pkl")
+        vectorizer = joblib.load("tfidf_vectorizer.pkl")
 
-            # Vectorize the input
-            X = vectorizer.transform(df['combined_text'])
+        # Predict exporter type
+        exporter_names = df["exporter_name"].astype(str)
+        X = vectorizer.transform(exporter_names)
+        predictions = model.predict(X)
 
-            # Make predictions
-            preds = model.predict(X)
+        df["Predicted Type"] = predictions
+        st.success("✅ Classification complete!")
+        st.dataframe(df)
 
-            # Convert labels to readable format (0 → Merchant, 1 → Manufacturer)
-            readable_preds = ['Merchant Exporter' if p == 0 else 'Manufacturer' for p in preds]
-            df['Predicted Exporter Type'] = readable_preds
+        # Download button
+        st.download_button(
+            label="📥 Download Results",
+            data=df.to_excel(index=False, engine="openpyxl"),
+            file_name="classified_exporters.xlsx",
+            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+        )
 
-            st.success("✅ Classification complete! Preview below:")
-            st.dataframe(df[['Predicted Exporter Type'] + available_cols].head())
-
-            # Download result
-            output_filename = "classified_exporters.xlsx"
-            df.to_excel(output_filename, index=False)
-
-            with open(output_filename, "rb") as f:
-                st.download_button(
-                    label="📥 Download Results as Excel",
-                    data=f,
-                    file_name=output_filename,
-                    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-                )
-
-    except Exception as e:
-        st.error(f"⚠️ Error processing file: {e}")
+# 🔚 End of app
