@@ -2,12 +2,9 @@ import streamlit as st
 import pandas as pd
 import joblib
 
-# ✅ Check if secrets are loading
-st.title("Exporter Classifier App - OAuth Check")
-
-st.subheader("🔐 OAuth Client Info (for test only - remove later)")
-st.write("Client ID:", st.secrets["google_oauth"]["client_id"])
-st.write("Client Secret:", st.secrets["google_oauth"]["client_secret"])
+# ✅ Confirm secrets are loaded, but don't display them
+st.title("Exporter Classifier App")
+st.success("✅ OAuth secrets loaded successfully.")
 
 # ⬇️ --- Existing app functionality starts here --- ⬇️
 
